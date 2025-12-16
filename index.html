@@ -3,76 +3,145 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Проверка Кейсов</title>
+    <title>AI Ментор: Бизнес-Анализ</title>
     <style>
-        body { font-family: sans-serif; background: #f4f4f4; padding: 20px; }
-        .container { max-width: 700px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        textarea { width: 100%; height: 150px; margin: 15px 0; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-family: inherit; }
-        button { background: #f6821f; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; font-size: 16px; transition: 0.3s; }
-        button:hover { background: #e06b0d; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
-        #result { margin-top: 20px; padding: 15px; background: #f0f9ff; border-left: 4px solid #f6821f; border-radius: 4px; display: none; line-height: 1.6; }
+        body { font-family: 'Helvetica Neue', sans-serif; background: #f0f2f5; color: #333; display: flex; justify-content: center; padding-top: 50px; }
+        .container { width: 100%; max-width: 800px; background: white; padding: 40px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        h1 { text-align: center; color: #2c3e50; margin-bottom: 30px; }
+        
+        .form-group { margin-bottom: 20px; }
+        label { font-weight: 600; display: block; margin-bottom: 8px; color: #444; }
+        select, textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+        textarea { height: 200px; resize: vertical; font-family: monospace; }
+        
+        .task-box { background: #e8f4fd; padding: 20px; border-radius: 8px; border-left: 5px solid #2196F3; margin-bottom: 25px; line-height: 1.6; }
+        
+        button { background: #2196F3; color: white; border: none; padding: 15px 30px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; width: 100%; transition: 0.2s; }
+        button:hover { background: #1976D2; }
+        button:disabled { background: #b0bec5; }
+        
+        #result { margin-top: 30px; padding: 25px; background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; display: none; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>Решение бизнес-кейса</h2>
-    
-    <!-- Скрытый текст кейса -->
-    <div id="caseData" style="display:none">
-        Компания "StarCoffee" хочет открыть точки в метро. 
-        Риски: высокая аренда, сложная логистика. 
-        Задание: Опишите 3 главных риска и способы их минимизации.
+    <h1>💼 Тренажер Бизнес-Аналитика</h1>
+
+    <div class="form-group">
+        <label>Выберите практический кейс:</label>
+        <select id="caseSelector" onchange="loadCase()">
+            <option value="ba_req_shop">🛒 Кейс 1: Сбор требований (E-commerce)</option>
+            <option value="ba_process_hr">⚡ Кейс 2: Оптимизация процессов (HR)</option>
+        </select>
     </div>
 
-    <p>Прочитайте кейс и напишите ваше решение:</p>
-    <textarea id="answer" placeholder="Мое решение..."></textarea>
-    <button id="btn" onclick="sendData()">Проверить решение</button>
+    <!-- Сюда будет подгружаться текст задания -->
+    <div id="taskDisplay" class="task-box"></div>
+
+    <div class="form-group">
+        <label>Ваше решение:</label>
+        <textarea id="solution" placeholder="1. User Stories...&#10;2. Non-functional...&#10;3. Criteria..."></textarea>
+    </div>
+    
+    <div class="form-group">
+        <label>Или загрузите файл (.txt, .md, .csv):</label>
+        <input type="file" id="fileInput">
+    </div>
+
+    <button id="btn" onclick="checkSolution()">Проверить решение</button>
+
     <div id="result"></div>
 </div>
 
 <script>
-    async function sendData() {
+    // Тексты заданий для отображения на экране
+    // (Они должны совпадать по смыслу с тем, что в базе данных)
+    const TASKS = {
+        "ba_req_shop": `
+            <b>Ситуация:</b> Владелец сети магазинов автозапчастей хочет запустить интернет-магазин.
+            <br><br>
+            <b>Интервью с заказчиком:</b> "Нужен сайт, чтобы вбил номер детали и купил. Важно видеть, есть ли деталь в Химках или Мытищах. Оплата картой. И смска мне о заказе."
+            <br><br>
+            <b>Ваша задача:</b>
+            1. Напишите 3 User Stories (функциональные требования).
+            2. Укажите 2 нефункциональных требования (производительность/доступность).
+            3. Опишите критерии приемки (Acceptance Criteria) для поиска товаров.
+        `,
+        "ba_process_hr": `
+            <b>Ситуация:</b> Новый сотрудник выходит на работу, но ждет ноутбук и доступы 5 дней. 
+            Процесс сейчас: Рекрутер -> Email -> Сисадмин -> Email -> Рекрутер -> Email -> Завхоз -> Excel -> Склад.
+            <br><br>
+            <b>Ваша задача:</b>
+            1. Выделите главные узкие места (Bottlenecks).
+            2. Опишите процесс TO-BE (как должно быть идеально).
+            3. Назовите метрики, которые улучшатся после ваших изменений.
+        `
+    };
+
+    function loadCase() {
+        const id = document.getElementById('caseSelector').value;
+        document.getElementById('taskDisplay').innerHTML = TASKS[id];
+    }
+    
+    // Загружаем первый кейс при старте
+    loadCase();
+
+    async function checkSolution() {
         const btn = document.getElementById('btn');
         const resDiv = document.getElementById('result');
-        const answer = document.getElementById('answer').value;
-        const caseText = document.getElementById('caseData').innerText;
+        const caseId = document.getElementById('caseSelector').value;
+        
+        let text = document.getElementById('solution').value;
+        const fileInput = document.getElementById('fileInput');
 
-        if(answer.length < 5) return alert("Напишите хоть что-нибудь!");
+        // Если есть файл, читаем его
+        if (fileInput.files.length > 0) {
+            try {
+                text = await readFile(fileInput.files[0]);
+            } catch (e) {
+                return alert("Ошибка чтения файла");
+            }
+        }
 
+        if (text.length < 10) return alert("Пожалуйста, напишите развернутое решение.");
+
+        // UI: Загрузка
         btn.disabled = true;
-        btn.innerText = "Анализирую...";
+        btn.innerText = "Анализирую решение...";
         resDiv.style.display = 'none';
 
         try {
-            // Отправляем на наш Cloudflare Backend
             const req = await fetch('/api/check', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ solution: answer, case_text: caseText })
+                body: JSON.stringify({ case_id: caseId, solution: text })
             });
             
             const data = await req.json();
             
-            if(data.error) {
-                resDiv.innerHTML = "Ошибка: " + data.error;
-            } else {
-                // Преобразуем Markdown (звездочки) в жирный текст для красоты
-                let formatted = data.result
-                    .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>') // жирный
-                    .replace(/\n/g, '<br>'); // переносы строк
-                
-                resDiv.innerHTML = formatted;
-            }
+            // Красивый вывод с форматированием
+            resDiv.innerHTML = data.result
+                .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>') // Жирный
+                .replace(/\n/g, '<br>'); // Переносы
+            
             resDiv.style.display = 'block';
 
         } catch (e) {
-            alert("Ошибка сети");
+            alert("Ошибка соединения: " + e.message);
         } finally {
             btn.disabled = false;
             btn.innerText = "Проверить решение";
         }
+    }
+
+    function readFile(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsText(file);
+        });
     }
 </script>
 
