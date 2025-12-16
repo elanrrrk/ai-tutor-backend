@@ -3,33 +3,33 @@ export async function onRequestPost(context) {
     const { request, env } = context;
     const body = await request.json();
     
-    // 1. Проверка: установлен ли ключ API в настройках Cloudflare
+    // 1. Проверка API ключа
     if (!env.GOOGLE_API_KEY) {
       return new Response(JSON.stringify({ 
-        result: "ОШИБКА НАСТРОЕК: Не найден GOOGLE_API_KEY. Проверьте Settings -> Environment variables в Cloudflare." 
+        result: "ОШИБКА НАСТРОЕК: Не найден GOOGLE_API_KEY. Проверьте Cloudflare Settings." 
       }), {
         headers: { "Content-Type": "application/json" }
       });
     }
 
-    // 2. Формируем запрос к нейросети
+    // 2. Промпт
     const prompt = `
       Ты опытный эксперт.
       КЕЙС: ${body.case_text}
-      
       РЕШЕНИЕ СТУДЕНТА: ${body.solution}
       
       ЗАДАНИЕ:
       Оцени решение студента. Будь объективен.
       1. Поставь оценку (из 10).
       2. Выдели сильные стороны.
-      3. Укажи на ошибки или риски.
-      4. Дай совет по улучшению.
+      3. Укажи на ошибки.
+      4. Дай совет.
       Используй HTML теги (<b>, <br>) для форматирования.
     `;
 
-    // === ИСПРАВЛЕНИЕ: Используем точную версию модели (gemini-1.5-flash-001) ===
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=${env.GOOGLE_API_KEY}`;
+    // === ИСПРАВЛЕНИЕ: Используем самую стандартную модель 'gemini-pro' ===
+    // Она есть на всех аккаунтах и работает всегда.
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${env.GOOGLE_API_KEY}`;
 
     const googleResponse = await fetch(url, {
       method: "POST",
@@ -43,7 +43,7 @@ export async function onRequestPost(context) {
 
     const googleData = await googleResponse.json();
 
-    // 3. Обработка ошибок от самого Google
+    // 3. Обработка ошибок Google
     if (googleData.error) {
        return new Response(JSON.stringify({ 
          result: "ОШИБКА API GOOGLE: " + googleData.error.message 
@@ -52,24 +52,23 @@ export async function onRequestPost(context) {
        });
     }
 
-    // 4. Достаем текст ответа
+    // 4. Достаем ответ
     const aiText = googleData.candidates?.[0]?.content?.parts?.[0]?.text;
     
     if (!aiText) {
        return new Response(JSON.stringify({ 
-         result: "ПУСТОЙ ОТВЕТ. Google вернул непонятные данные: " + JSON.stringify(googleData) 
+         result: "ПУСТОЙ ОТВЕТ ОТ GOOGLE: " + JSON.stringify(googleData) 
        }), {
          headers: { "Content-Type": "application/json" }
        });
     }
 
-    // 5. Успех! Возвращаем ответ на сайт
+    // 5. Успех
     return new Response(JSON.stringify({ result: aiText }), {
       headers: { "Content-Type": "application/json" },
     });
 
   } catch (err) {
-    // Ловим любые технические ошибки (в коде)
-    return new Response(JSON.stringify({ result: "КРИТИЧЕСКАЯ ОШИБКА: " + err.message }), { status: 200 });
+    return new Response(JSON.stringify({ result: "ОШИБКА КОДА: " + err.message }), { status: 200 });
   }
 }
