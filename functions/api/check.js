@@ -1,57 +1,60 @@
 export async function onRequestPost(context) {
   try {
-    // 1. Читаем данные, которые прислал студент
     const { request, env } = context;
     const body = await request.json();
     
-    const studentSolution = body.solution;
-    const caseText = body.case_text;
-
-    if (!studentSolution || !caseText) {
-      return new Response(JSON.stringify({ error: "Нет текста" }), { status: 400 });
+    // Проверка, установлен ли ключ
+    if (!env.GOOGLE_API_KEY) {
+      return new Response(JSON.stringify({ result: "ОШИБКА: Не найден GOOGLE_API_KEY в настройках Cloudflare!" }), {
+        headers: { "Content-Type": "application/json" }
+      });
     }
 
-    // 2. Формируем промпт (Инструкцию)
     const prompt = `
-      Ты строгий, но справедливый преподаватель.
-      
-      ТЕКСТ КЕЙСА:
-      ${caseText}
-      
-      ОТВЕТ СТУДЕНТА:
-      ${studentSolution}
-      
-      ИНСТРУКЦИЯ:
-      Оцени ответ, укажи ошибки и дай рекомендации. Используй HTML теги для форматирования.
+      КЕЙС: ${body.case_text}
+      ОТВЕТ: ${body.solution}
+      Задание: Оцени ответ студента, найди ошибки.
     `;
 
-    // 3. Отправляем запрос в Google Gemini (через REST API)
-    // Мы используем fetch, встроенный в Cloudflare, без установки библиотек
-    const googleApiKey = env.GOOGLE_API_KEY; // Берем ключ из настроек Cloudflare
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${googleApiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.GOOGLE_API_KEY}`;
 
     const googleResponse = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{
-          parts: [{ text: prompt }]
-        }]
+        contents: [{ parts: [{ text: prompt }] }]
       })
     });
 
     const googleData = await googleResponse.json();
 
-    // 4. Достаем текст из ответа Google
-    // Google возвращает вложенную структуру, нам нужно добраться до текста
-    const aiText = googleData.candidates?.[0]?.content?.parts?.[0]?.text || "Ошибка получения ответа от ИИ";
+    // === ЛОГИКА ОТЛАДКИ ===
+    // Если Google вернул ошибку явно
+    if (googleData.error) {
+       return new Response(JSON.stringify({ 
+         result: "ОШИБКА GOOGLE: " + googleData.error.message 
+       }), {
+         headers: { "Content-Type": "application/json" }
+       });
+    }
 
-    // 5. Отдаем ответ сайту
+    // Если ответ пустой или странный
+    const aiText = googleData.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (!aiText) {
+       // Возвращаем "внутренности" ответа, чтобы понять, что пришло
+       return new Response(JSON.stringify({ 
+         result: "СТРАННЫЙ ОТВЕТ (скиньте это в чат): " + JSON.stringify(googleData) 
+       }), {
+         headers: { "Content-Type": "application/json" }
+       });
+    }
+
     return new Response(JSON.stringify({ result: aiText }), {
       headers: { "Content-Type": "application/json" },
     });
 
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    return new Response(JSON.stringify({ result: "ОШИБКА КОДА: " + err.message }), { status: 200 });
   }
 }
