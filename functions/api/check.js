@@ -3,10 +3,10 @@ export async function onRequestPost(context) {
     const { request, env } = context;
     const body = await request.json();
     
-    // Проверяем ключ Groq
+    // Проверяем ключ
     if (!env.GROQ_API_KEY) {
       return new Response(JSON.stringify({ 
-        result: "ОШИБКА: Не найден GROQ_API_KEY. Добавьте его в настройках Cloudflare." 
+        result: "ОШИБКА: Не найден GROQ_API_KEY в настройках Cloudflare." 
       }), {
         headers: { "Content-Type": "application/json" }
       });
@@ -23,10 +23,10 @@ export async function onRequestPost(context) {
       
       ЗАДАНИЕ:
       Проверь решение. Дай оценку (1-10), выдели плюсы и укажи на ошибки.
-      Используй HTML теги (<b>, <br>) для форматирования. Отвечай на русском.
+      Используй HTML теги (<b>, <br>) для форматирования. Отвечай на русском языке.
     `;
 
-    // Запрос к Groq (используем модель Llama 3)
+    // Запрос к Groq с НОВОЙ моделью
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -34,7 +34,8 @@ export async function onRequestPost(context) {
         "Authorization": `Bearer ${env.GROQ_API_KEY}`
       },
       body: JSON.stringify({
-        model: "llama3-8b-8192", // Очень быстрая и умная модель
+        // === ИЗМЕНЕНИЕ: Актуальная модель на 2025 год ===
+        model: "llama-3.3-70b-versatile", 
         messages: [
           { role: "user", content: prompt }
         ],
@@ -44,7 +45,7 @@ export async function onRequestPost(context) {
 
     const data = await response.json();
 
-    // Обработка ошибок Groq
+    // Обработка ошибок
     if (data.error) {
        return new Response(JSON.stringify({ 
          result: "ОШИБКА GROQ: " + data.error.message 
